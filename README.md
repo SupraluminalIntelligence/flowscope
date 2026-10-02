@@ -33,6 +33,22 @@ scope = FlowScope(model, optimizer, every=50, label="baseline")
 In Jupyter/Colab it draws inline; in a script it serves the live page.
 `notebooks/gpt-dev-flowscope.ipynb` is Karpathy's gpt-dev notebook with FlowScope cells and experiments.
 
+## Compare checkpoints of a Hugging Face model
+
+`flowscope.compare` records the residual stream at every layer for chosen tokens from any Hugging Face model
+(`output_hidden_states`, so hybrid conv/attention models work too), and writes one tour frame per checkpoint in a
+shared principal basis, with linear CKA against the first checkpoint for every layer. GrandTourVision opens the
+result with a checkpoint picker.
+
+`examples/harness_compare.py` asks what multi-harness RL changed inside LFM2.5-2.6B
+([FineEnvs article](https://huggingface.co/spaces/AdithyaSK/multi-harness-rl)): the same tasks, run in Claude Code,
+Codex, OpenCode and mini-swe-agent, through the base, SFT and RL checkpoints.
+
+```bash
+uv sync --extra compare
+HF_HOME=/path/with/room uv run --extra compare python examples/harness_compare.py   # ~22 GB of checkpoints
+```
+
 ## What you're looking at
 
 - **Forward lane**: residual stream RMS at each block boundary. Red = signal shrinking toward zero.

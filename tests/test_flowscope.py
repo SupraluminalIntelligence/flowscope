@@ -85,3 +85,26 @@ def test_tour_shares_one_basis_and_shows_rank_collapse():
     dims = lambda s: [l["dim"] for l in s.tour_payload["layers"]]
     assert dims(healthy)[-1] > 0.7 * dims(healthy)[0]  # residual stream keeps its dimensionality at init
     assert dims(blocked)[-1] < 0.35 * dims(blocked)[0]  # without residuals it collapses toward a line
+
+
+def test_compare_frames_share_one_basis_and_report_similarity(tmp_path):
+    transformers = pytest.importorskip("transformers")
+    from flowscope.compare import capture, frames, linear_cka
+
+    torch.manual_seed(0)
+    cfg = transformers.LlamaConfig(vocab_size=50, hidden_size=32, intermediate_size=64, num_hidden_layers=3,
+                                   num_attention_heads=4, num_key_value_heads=4)
+    for name in ("a", "b"):
+        transformers.LlamaModel(cfg).save_pretrained(tmp_path / name)
+    seqs, windows = [[1, 2, 3, 4, 5, 6, 7, 8], [9, 8, 7, 6, 5, 4]], [(2, 4), (1, 4)]
+    a, _ = capture(str(tmp_path / "a"), seqs, windows, "cpu", dtype=torch.float32)
+    b, _ = capture(str(tmp_path / "b"), seqs, windows, "cpu", dtype=torch.float32)
+    assert len(a) == 4 and a[0].shape == (8, 32)  # embeddings + 3 layers, 2 windows x 4 tokens
+
+    out = frames({"a": a, "a again": a, "b": b}, ["emb", "b1", "b2", "b3"], tokens=list(range(8)), texts=["x"] * 8,
+                 groups=[0] * 4 + [1] * 4, group_names=["g0", "g1"], T=4, title="t", k=6)
+    assert [f["name"] for f in out] == ["a", "a again", "b"] and all(f["C"] == 6 and f["N"] == 8 for f in out)
+    assert out[0]["layers"][2]["data"] == out[1]["layers"][2]["data"]  # one shared basis: same input, same coordinates
+    assert out[1]["similarity"] == [1.0] * 4 and min(out[2]["similarity"][1:]) < 0.999
+    assert out[1]["change"] == [0.0] * 4 and min(out[2]["change"][1:]) > 0.1  # a different model moves the vectors
+    assert abs(linear_cka(a[1], a[1] @ torch.linalg.qr(torch.randn(32, 32))[0] * 3) - 1) < 1e-6  # rotation/scale invariant

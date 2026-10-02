@@ -10,6 +10,10 @@ dependencies = ["torch>=2.1", "numpy"]
 [project.scripts]
 flowscope = "flowscope.cli:main"
 
+[project.optional-dependencies]
+# compare checkpoints of Hugging Face models (flowscope.compare, examples/harness_compare.py)
+compare = ["transformers>=4.57", "pyarrow", "huggingface_hub"]
+
 [dependency-groups]
 dev = ["pytest", "ipykernel", "nbclient", "nbformat"]
 
